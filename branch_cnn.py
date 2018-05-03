@@ -15,13 +15,14 @@ import sklearn.preprocessing as preprocessing
 
 
 CROSS_FOLDS = 5
-data_dir = "./EEG_Feature_2Hz/"
+data_dir = "./EEG_Feature_5Bands"
 label_dir = "./perclos_labels/"
 
-input_height = 17
-input_width = 25
-input_channel_num = 1
-conv_channel_num = 8
+input_height = 6
+input_width = 9
+input_depth = 5
+input_channel_num = input_depth
+conv_channel_num = 32
 
 learning_rate = 1e-4
 
@@ -43,6 +44,39 @@ def read_dataset(data_dir,label_dir,filename):
         final_dataset = np.vstack([final_dataset,temp])
     final_dataset = np.transpose(final_dataset,[0,2,3,1])
     return final_dataset,labels
+
+def read_dataset_5bands(data_dir,label_dir,filename):
+    # final_dataset = np.empty([0,2,input_height,input_width])
+    final_dataset = np.empty([0,input_depth,input_height,input_width])
+    data = sio.loadmat(data_dir +"/"+ filename)
+    labels = sio.loadmat(label_dir + filename)["perclos"]
+    dataset_de = np.transpose(data["de_movingAve"], [1, 2, 0])
+    for i in range(len(dataset_de)):
+        temp = np.empty([0,input_height,input_width])
+        # print("temp shape:",temp.shape)
+        for j in range(0,dataset_de.shape[1]):
+            # temp = temp.reshape(1,1,input_height,input_width)
+            data_2D = data_1Dto2D(dataset_de[i,j,:])
+            data_2D = data_2D.reshape(1,input_height,input_width)
+            # print("data_2D shape:",data_2D.shape)
+            temp = np.vstack([temp,data_2D])
+        # print("final_dataset shape:",final_dataset.shape)
+        temp = temp.reshape(1,input_depth,input_height,input_width)
+        # print("temp shape:",temp.shape)
+        final_dataset = np.vstack([final_dataset,temp])
+    final_dataset = np.transpose(final_dataset,[0,2,3,1])
+    return final_dataset,labels
+
+def data_1Dto2D(data, width=9, height=6):
+    data_2D = np.zeros([height,width])
+    data_2D[0] = (data[0],    0,   0,   0,          0,          0,          0,    0,      data[1])
+    data_2D[1] = (data[2],    0,   0,   0,          0,          0,          0,    0,      data[3])
+    data_2D[2] = (data[4],    0,   0,   data[6],    0,          data[7],    0,    0,      data[5])
+    data_2D[3] = (0,          0,   0,   data[8],    data[9],    data[10],   0,    0,      0      )
+    data_2D[4] = (0,          0,   0,   data[11],   data[12],   data[13],   0,    0,      0      )
+    data_2D[5] = (0,          0,   0,   data[14],   data[15],   data[16],   0,    0,      0      )
+    # return shape:9*9
+    return data_2D
 
 def weight_variable(shape,name):
     initial = tf.truncated_normal(shape, stddev=0.1)
@@ -87,29 +121,17 @@ def apply_readout(x, x_size, readout_size,name):
     readout_bias = bias_variable([readout_size],name)
     return tf.add(tf.matmul(x, readout_weight), readout_bias)
 # kernel parameter
-branch1_kernel_height_1st = 5
-branch1_kernel_width_1st = 5
+branch1_kernel_height_1st = 3
+branch1_kernel_width_1st = 3
 
-branch1_kernel_height_2nd = 4
-branch1_kernel_width_2nd = 4
+branch1_kernel_height_2nd = 3
+branch1_kernel_width_2nd = 3
 
 branch1_kernel_height_3rd = 3
 branch1_kernel_width_3rd = 3
 
-branch1_kernel_height_4th = 2
-branch1_kernel_width_4th = 2
-
-branch2_kernel_height_1st = 5
-branch2_kernel_width_1st = 5
-
-branch2_kernel_height_2nd = 4
-branch2_kernel_width_2nd = 4
-
-branch2_kernel_height_3rd = 3
-branch2_kernel_width_3rd = 3
-
-branch2_kernel_height_4th = 2
-branch2_kernel_width_4th = 2
+branch1_kernel_height_4th = 3
+branch1_kernel_width_4th = 3
 
 kernel_stride = 1
 
@@ -124,7 +146,8 @@ batch_size = 64
 
 file = sys.argv[1]
 
-dataset,labels = read_dataset(data_dir,label_dir,file)
+dataset,labels = read_dataset_5bands(data_dir,label_dir,file)
+print("dataset.shape:",dataset.shape)
 
 folds = 5
 
@@ -137,30 +160,23 @@ phase_train = tf.placeholder(tf.bool, name='phase_train')
 
 ###########################################################################################
 # first CNN layer
-conv_1_1 = apply_conv2d(cnn_in, branch1_kernel_height_1st, branch1_kernel_width_1st, input_channel_num, conv_channel_num, kernel_stride,'conv1_1')
-print("conv_1_1 shape:", conv_1_1.shape)
+conv_1 = apply_conv2d(cnn_in, branch1_kernel_height_1st, branch1_kernel_width_1st, input_channel_num, conv_channel_num, kernel_stride,'conv1_1')
+print("conv_1_1 shape:", conv_1.shape)
 # conv_1_2 = apply_conv2d(cnn_in, branch2_kernel_height_1st, branch2_kernel_width_1st, input_channel_num, conv_channel_num, kernel_stride,'conv1_2')
 # print("conv_1 shape:", conv_1.shape)
 print("\n")
 # second CNN layer
-conv_2_1 = apply_conv2d(conv_1_1, branch1_kernel_height_2nd, branch1_kernel_width_2nd, conv_channel_num, conv_channel_num * 2, kernel_stride,'conv2_1')
-print("conv_2_1 shape:", conv_2_1.shape)
+conv_2 = apply_conv2d(conv_1, branch1_kernel_height_2nd, branch1_kernel_width_2nd, int(conv_1.shape[3]), conv_channel_num * 2, kernel_stride,'conv2_1')
+print("conv_2_1 shape:", conv_2.shape)
 # conv_2_2 = apply_conv2d(conv_1_2, branch2_kernel_height_2nd, branch2_kernel_width_2nd, conv_channel_num, conv_channel_num * 2, kernel_stride,'conv2_2')
 # conv_2 = tf.concat([conv_2_1,conv_2_2],3,name="concat2")
 # print("conv_2 shape:", conv_2.shape)
 print("\n")
 # third CNN layer
-conv_3_1 = apply_conv2d(conv_2_1, branch1_kernel_height_3rd, branch1_kernel_width_3rd, conv_channel_num * 2, conv_channel_num * 4, kernel_stride,'conv3_1')
-print("conv_3_1 shape:", conv_3_1.shape)
+conv_3 = apply_conv2d(conv_2, branch1_kernel_height_3rd, branch1_kernel_width_3rd, int(conv_2.shape[3]), conv_channel_num * 4, kernel_stride,'conv3_1')
+print("conv_3 shape:", conv_3.shape)
 # conv_3_2 = apply_conv2d(conv_2_2, branch2_kernel_height_3rd, branch2_kernel_width_3rd, conv_channel_num * 2, conv_channel_num * 4, kernel_stride,'conv3_2')
 # fourth CNN layer
-# conv_4_1 = apply_conv2d(conv_3_1, branch1_kernel_height_4th, branch1_kernel_width_4th, conv_channel_num * 4, conv_channel_num * 4, kernel_stride,'conv3_1')
-# print("conv_3_1 shape:", conv_4_1.shape)
-# conv_4_2 = apply_conv2d(conv_3_2, branch2_kernel_height_4th, branch2_kernel_width_4th, conv_channel_num * 4, conv_channel_num * 4, kernel_stride,'conv3_2')
-# conv_3 = tf.concat([conv_3_1,conv_3_2],3,name="concat2")
-conv_3 = conv_3_1
-print("conv_3 shape:", conv_3.shape)
-print("\n")
 
 shape = conv_3.get_shape().as_list()
 conv_5_flat = tf.reshape(conv_3, [-1, shape[1] * shape[2] * shape[3]])
