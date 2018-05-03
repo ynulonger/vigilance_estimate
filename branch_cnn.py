@@ -18,8 +18,8 @@ CROSS_FOLDS = 5
 data_dir = "./EEG_Feature_5Bands"
 label_dir = "./perclos_labels/"
 
-input_height = 6
-input_width = 9
+input_height = 4
+input_width = 3
 input_depth = 5
 input_channel_num = input_depth
 conv_channel_num = 32
@@ -67,14 +67,14 @@ def read_dataset_5bands(data_dir,label_dir,filename):
     final_dataset = np.transpose(final_dataset,[0,2,3,1])
     return final_dataset,labels
 
-def data_1Dto2D(data, width=9, height=6):
+def data_1Dto2D(data, width=3, height=4):
     data_2D = np.zeros([height,width])
-    data_2D[0] = (data[0],    0,   0,   0,          0,          0,          0,    0,      data[1])
-    data_2D[1] = (data[2],    0,   0,   0,          0,          0,          0,    0,      data[3])
-    data_2D[2] = (data[4],    0,   0,   data[6],    0,          data[7],    0,    0,      data[5])
-    data_2D[3] = (0,          0,   0,   data[8],    data[9],    data[10],   0,    0,      0      )
-    data_2D[4] = (0,          0,   0,   data[11],   data[12],   data[13],   0,    0,      0      )
-    data_2D[5] = (0,          0,   0,   data[14],   data[15],   data[16],   0,    0,      0      )
+    # data_2D[0] = (data[0],    0,   0,   0,          0,          0,          0,    0,      data[1])
+    # data_2D[1] = (data[2],    0,   0,   0,          0,          0,          0,    0,      data[3])
+    data_2D[0] = (   data[6],    0,          data[7] )
+    data_2D[1] = (   data[8],    data[9],    data[10])
+    data_2D[2] = (   data[11],   data[12],   data[13])
+    data_2D[3] = (   data[14],   data[15],   data[16])
     # return shape:9*9
     return data_2D
 
