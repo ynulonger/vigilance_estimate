@@ -1,2 +1,1 @@
-# ijcnn
-IJCNN 2018 
+# Nothing to say!
